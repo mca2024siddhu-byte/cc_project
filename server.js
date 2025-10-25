@@ -60,7 +60,7 @@ app.use(session({
 }));
 
 // MongoDB connection
-mongoose.connect('mongodb://localhost:27017/express-blog')
+mongoose.connect('mongodb://ukiblogs-server:VBm8UlSnHGaJTlaCHiriYK6Odnjxa3sRofk6EPFjou4yQb1LjyTGpMc4Ia3NrUtTTBvgbsRTyVHgACDborNWQQ==@ukiblogs-server.mongo.cosmos.azure.com:10255/?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=@ukiblogs-server@')
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
