@@ -62,7 +62,7 @@ app.use(session({
 }));
 
 // MongoDB connection for Azure Cosmos DB
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ukiblogdb:F4U3Op0uNAdpQybMkKD1xPHDCOtnIfJY8W0D4tW1S614Fa9QQI84e1ujVnwID56i1pPKYkXkuVO4ACDbY6pWTQ%3D%3D@ukiblogdb.mongo.cosmos.azure.com:10255/?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=%40ukiblogdb%40';
+const MONGODB_URI = 'mongodb://ukiblogdb:F4U3Op0uNAdpQybMkKD1xPHDCOtnIfJY8W0D4tW1S614Fa9QQI84e1ujVnwID56i1pPKYkXkuVO4ACDbY6pWTQ%3D%3D@ukiblogdb.mongo.cosmos.azure.com:10255/?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=%40ukiblogdb%40';
 
 console.log('🔧 Attempting to connect to MongoDB...');
 console.log('📡 Connection URL:', MONGODB_URI ? 'Provided' : 'Missing');
