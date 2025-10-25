@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Write - Élégance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Lora:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        .font-display { font-family: 'Playfair Display', serif; }
+        .font-serif { font-family: 'Lora', serif; }
+        .font-inter { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Lora', serif; }
+        
+        /* Hide placeholder on focus */
+        .title-input:focus::placeholder,
+        .content-input:focus::placeholder {
+            opacity: 0.3;
+        }
+        
+        /* Floating Toolbar */
+        .floating-toolbar {
+            transform: translateY(-20px);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .floating-toolbar.visible {
+            transform: translateY(0);
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        /* Plus Button Animation */
+        .plus-btn {
+            transition: all 0.3s ease;
+        }
+        
+        .plus-btn:hover {
+            transform: scale(1.1) rotate(90deg);
+        }
+        
+        /* Image Upload Overlay */
+        .upload-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+        
+        .upload-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        /* Selection */
+        ::selection {
+            background: #10b981;
+            color: white;
+        }
+        
+        /* Remove default outline */
+        .title-input:focus,
+        .content-input:focus {
+            outline: none;
+        }
+        
+        /* Smooth scroll */
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        /* Image preview in content */
+        .content-image {
+            margin: 2rem 0;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        
+        .content-image img {
+            width: 100%;
+            height: auto;
+        }
+        
+        /* Video preview */
+        .content-video {
+            margin: 2rem 0;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-white min-h-screen font-serif antialiased">
+    <!-- Simple Top Bar -->
+    <nav class="fixed top-0 left-0 right-0 bg-white border-b border-slate-200 z-50">
+        <div class="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="/" class="text-xl font-display font-bold text-slate-900 hover:text-emerald-600 transition-colors">
+                Élégance
+            </a>
+            
+            <div class="flex items-center gap-4">
+                <button 
+                    type="button" 
+                    id="publishBtn"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-full text-sm font-medium transition-all"
+                >
+                    Publish
+                </button>
+                <a href="/" class="text-slate-500 hover:text-slate-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Editor -->
+    <div class="max-w-3xl mx-auto px-6 pt-24 pb-20">
+        <form method="POST" enctype="multipart/form-data" id="storyForm">
+            <!-- Title Input -->
+            <input
+                type="text"
+                id="title"
+                name="title"
+                required
+                class="title-input w-full text-5xl font-display font-bold text-slate-900 placeholder-slate-300 border-none mb-8"
+                placeholder="Title"
+                maxlength="100"
+            >
+            
+            <!-- Cover Image Preview (Hidden by default) -->
+            <div id="coverImagePreview" class="hidden mb-12">
+                <div class="relative group">
+                    <img id="coverImageElement" src="" alt="Cover" class="w-full h-auto rounded-lg">
+                    <button 
+                        type="button" 
+                        onclick="removeCoverImage()"
+                        class="absolute top-4 right-4 w-10 h-10 bg-black/70 hover:bg-black text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Hidden file inputs -->
+            <input type="file" id="headerImage" name="headerImage" accept="image/*" class="hidden" onchange="handleCoverImage(this)">
+            <input type="file" id="video" name="video" accept="video/*" class="hidden" onchange="handleVideo(this)">
+
+            <!-- Video Preview (Hidden by default) -->
+            <div id="videoPreview" class="hidden mb-12">
+                <div class="relative group bg-slate-100 rounded-lg p-6">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-semibold text-slate-900" id="videoFileName"></p>
+                            <p class="text-sm text-slate-600" id="videoFileSize"></p>
+                        </div>
+                        <button 
+                            type="button" 
+                            onclick="removeVideo()"
+                            class="w-8 h-8 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center text-red-600 transition-colors"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Textarea -->
+            <textarea
+                id="content"
+                name="content"
+                required
+                rows="20"
+                class="content-input w-full text-xl text-slate-800 placeholder-slate-300 border-none resize-none leading-relaxed"
+                placeholder="Tell your story..."
+                oninput="autoResize(this)"
+            ></textarea>
+        </form>
+    </div>
+
+    <!-- Floating Plus Button -->
+    <button 
+        type="button"
+        id="plusBtn"
+        class="plus-btn fixed left-6 top-1/2 -translate-y-1/2 w-12 h-12 bg-white border-2 border-slate-300 text-slate-600 rounded-full flex items-center justify-center hover:border-emerald-500 hover:text-emerald-600 shadow-lg"
+        onclick="toggleMediaMenu()"
+    >
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+    </button>
+
+    <!-- Media Menu (appears on + click) -->
+    <div id="mediaMenu" class="fixed left-20 top-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl border border-slate-200 hidden">
+        <div class="p-2 space-y-1">
+            <button 
+                type="button"
+                onclick="document.getElementById('headerImage').click(); toggleMediaMenu();"
+                class="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors text-left group"
+            >
+                <div class="w-10 h-10 bg-blue-100 group-hover:bg-blue-200 rounded-lg flex items-center justify-center transition-colors">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="font-medium text-slate-900 text-sm">Add Image</div>
+                    <div class="text-xs text-slate-500">Cover photo</div>
+                </div>
+            </button>
+            
+            <button 
+                type="button"
+                onclick="document.getElementById('video').click(); toggleMediaMenu();"
+                class="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-50 transition-colors text-left group"
+            >
+                <div class="w-10 h-10 bg-purple-100 group-hover:bg-purple-200 rounded-lg flex items-center justify-center transition-colors">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="font-medium text-slate-900 text-sm">Add Video</div>
+                    <div class="text-xs text-slate-500">Embed video</div>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <!-- Bottom Stats Bar -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 py-3 px-6">
+        <div class="max-w-4xl mx-auto flex items-center justify-between text-sm text-slate-500">
+            <div class="flex items-center gap-6">
+                <span><span id="wordCount">0</span> words</span>
+                <span><span id="charCount">0</span> characters</span>
+                <span><span id="readTime">0</span> min read</span>
+            </div>
+            <div class="flex items-center gap-2 text-emerald-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                <span class="text-xs">Draft saved</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Alert -->
+    <% if (typeof error !== 'undefined' && error) { %>
+        <div class="fixed top-20 right-6 bg-red-50 border-l-4 border-red-500 text-red-800 px-6 py-4 rounded-r-lg shadow-lg max-w-md z-50">
+            <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <p class="text-sm font-medium"><%= error %></p>
+            </div>
+        </div>
+    <% } %>
+
+    <script>
+        // Auto-resize textarea
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+            updateStats();
+        }
+
+        // Update word count, char count, reading time
+        function updateStats() {
+            const content = document.getElementById('content').value;
+            const words = content.trim().split(/\s+/).filter(word => word.length > 0).length;
+            const chars = content.length;
+            const readTime = Math.ceil(words / 200) || 0;
+
+            document.getElementById('wordCount').textContent = words;
+            document.getElementById('charCount').textContent = chars;
+            document.getElementById('readTime').textContent = readTime;
+        }
+
+        // Toggle media menu
+        function toggleMediaMenu() {
+            const menu = document.getElementById('mediaMenu');
+            menu.classList.toggle('hidden');
+        }
+
+        // Close media menu when clicking outside
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('mediaMenu');
+            const plusBtn = document.getElementById('plusBtn');
+            if (!menu.contains(e.target) && !plusBtn.contains(e.target)) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        // Handle cover image upload
+        function handleCoverImage(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('coverImageElement').src = e.target.result;
+                    document.getElementById('coverImagePreview').classList.remove('hidden');
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Remove cover image
+        function removeCoverImage() {
+            document.getElementById('headerImage').value = '';
+            document.getElementById('coverImagePreview').classList.add('hidden');
+        }
+
+        // Handle video upload
+        function handleVideo(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                
+                document.getElementById('videoFileName').textContent = file.name;
+                document.getElementById('videoFileSize').textContent = fileSize + ' MB';
+                document.getElementById('videoPreview').classList.remove('hidden');
+            }
+        }
+
+        // Remove video
+        function removeVideo() {
+            document.getElementById('video').value = '';
+            document.getElementById('videoPreview').classList.add('hidden');
+        }
+
+        // Publish button
+        document.getElementById('publishBtn').addEventListener('click', function() {
+            const title = document.getElementById('title').value.trim();
+            const content = document.getElementById('content').value.trim();
+
+            if (!title) {
+                alert('Please add a title to your story');
+                document.getElementById('title').focus();
+                return;
+            }
+
+            if (!content) {
+                alert('Please write your story');
+                document.getElementById('content').focus();
+                return;
+            }
+
+            // Submit the form
+            document.getElementById('storyForm').submit();
+        });
+
+        // Auto-save (simulation)
+        let saveTimeout;
+        ['title', 'content'].forEach(id => {
+            document.getElementById(id).addEventListener('input', () => {
+                clearTimeout(saveTimeout);
+                saveTimeout = setTimeout(() => {
+                    // Here you would save to localStorage or send to server
+                    console.log('Draft saved');
+                }, 1000);
+            });
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl/Cmd + Enter to publish
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                document.getElementById('publishBtn').click();
+            }
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStats();
+            
+            // Focus on title on load
+            document.getElementById('title').focus();
+        });
+    </script>
+</body>
+</html>

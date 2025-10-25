@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= user.username %> - Profile | Élégance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Lora:wght@400;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .font-display { font-family: 'Playfair Display', serif; }
+        .font-serif { font-family: 'Lora', serif; }
+        .font-inter { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Button Effects */
+        .btn-elegant {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-elegant::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .btn-elegant:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .btn-elegant:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        /* Profile Picture Glow */
+        .profile-picture {
+            position: relative;
+            animation: profileGlow 3s ease-in-out infinite;
+        }
+        
+        @keyframes profileGlow {
+            0%, 100% { filter: drop-shadow(0 0 20px rgba(16, 185, 129, 0.5)); }
+            50% { filter: drop-shadow(0 0 30px rgba(20, 184, 166, 0.7)); }
+        }
+        
+        /* Stats Cards Animation */
+        .stat-card {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-8px) rotate(-2deg);
+        }
+        
+        .stat-card:nth-child(2):hover {
+            transform: translateY(-8px) scale(1.05);
+        }
+        
+        .stat-card:nth-child(3):hover {
+            transform: translateY(-8px) rotate(2deg);
+        }
+        
+        /* Blog Card with Image Overlay */
+        .blog-card-overlay {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .blog-card-overlay::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .blog-card-overlay:hover::before {
+            left: 100%;
+        }
+        
+        /* Pattern Background */
+        .pattern-bg {
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(20, 184, 166, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(6, 182, 212, 0.05) 0%, transparent 50%);
+        }
+        
+        /* Floating Animation */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .float-animation {
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        /* Achievement Badge */
+        .achievement-badge {
+            position: relative;
+            animation: spin 20s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Gradient Text */
+        .gradient-text {
+            background: linear-gradient(135deg, #10b981, #14b8a6, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* Grid Pattern */
+        .grid-pattern {
+            background-image: 
+                linear-gradient(rgba(16, 185, 129, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(16, 185, 129, 0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        
+        /* Modal Animation */
+        .modal-content {
+            animation: modalSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        
+        /* Selection */
+        ::selection {
+            background: #10b981;
+            color: white;
+        }
+        
+        /* Shimmer Effect */
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-white to-slate-50 min-h-screen font-inter antialiased pattern-bg">
+    <!-- Navigation -->
+    <nav class="bg-white/90 backdrop-blur-md shadow-sm border-b border-slate-200 sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-3 flex justify-between items-center max-w-7xl">
+            <a href="/" class="text-2xl font-display font-bold bg-gradient-to-r from-slate-800 via-emerald-700 to-teal-600 bg-clip-text text-transparent hover:from-emerald-600 hover:to-teal-500 transition-all">
+                Élégance
+            </a>
+            <div class="flex gap-2 items-center">
+                <a href="/" class="btn-elegant bg-white text-slate-700 px-4 py-2 rounded-full text-sm border border-slate-200 shadow-sm relative z-10 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                    Home
+                </a>
+                <a href="/create" class="btn-elegant bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-4 py-2 rounded-full text-sm shadow-lg shadow-emerald-500/30 relative z-10 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                    </svg>
+                    Write
+                </a>
+                <form method="POST" action="/logout" class="m-0">
+                    <button type="submit" class="btn-elegant bg-slate-100 text-slate-700 px-4 py-2 rounded-full hover:bg-slate-200 text-sm relative z-10">
+                        Logout
+                    </button>
+                </form>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-6 py-8 max-w-7xl">
+        <div class="grid lg:grid-cols-3 gap-6">
+            <!-- Left Sidebar - Profile Card -->
+            <div class="lg:col-span-1 space-y-6">
+                <!-- Profile Info Card -->
+                <div class="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden relative">
+                    <!-- Decorative Background -->
+                    <div class="h-24 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 relative overflow-hidden">
+                        <div class="absolute inset-0 grid-pattern opacity-30"></div>
+                        <div class="absolute top-2 right-2">
+                            <div class="achievement-badge w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg">
+                                <svg class="w-4 h-4 text-yellow-900" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="px-6 pb-6 text-center">
+                        <!-- Profile Picture -->
+                        <div class="profile-picture -mt-12 mb-4 inline-block">
+                            <div class="relative">
+                                <img 
+                                    src="<%= user.profilePicture %>" 
+                                    alt="<%= user.username %>"
+                                    class="w-24 h-24 rounded-full object-cover border-4 border-white shadow-2xl"
+                                    onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"200\"%3E%3Cdefs%3E%3ClinearGradient id=\"grad\" x1=\"0%25\" y1=\"0%25\" x2=\"100%25\" y2=\"100%25\"%3E%3Cstop offset=\"0%25\" style=\"stop-color:%2310b981;stop-opacity:1\" /%3E%3Cstop offset=\"100%25\" style=\"stop-color:%2314b8a6;stop-opacity:1\" /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill=\"url(%23grad)\" width=\"200\" height=\"200\"/%3E%3Ctext fill=\"white\" font-size=\"100\" font-family=\"Arial\" x=\"50%25\" y=\"50%25\" text-anchor=\"middle\" dy=\".3em\"%3E<%= user.username.charAt(0).toUpperCase() %>%3C/text%3E%3C/svg%3E'"
+                                >
+                                <div class="absolute bottom-0 right-0 w-6 h-6 bg-green-500 border-2 border-white rounded-full"></div>
+                            </div>
+                        </div>
+                        
+                        <h1 class="text-2xl font-display font-bold text-slate-900 mb-1">
+                            <%= user.username %>
+                        </h1>
+                        
+                        <div class="flex items-center justify-center gap-2 mb-3">
+                            <span class="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-semibold">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                </svg>
+                                Verified
+                            </span>
+                        </div>
+                        
+                        <p class="text-slate-600 text-xs mb-4 flex items-center justify-center gap-1">
+                            <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
+                            <%= user.email %>
+                        </p>
+                        
+                        <% if (user.bio) { %>
+                            <p class="text-slate-700 mb-4 text-sm leading-relaxed">
+                                <%= user.bio %>
+                            </p>
+                        <% } else { %>
+                            <p class="text-slate-500 italic mb-4 text-xs">
+                                <a href="/profile/edit" class="text-emerald-600 hover:text-emerald-700 font-semibold">
+                                    Add a bio
+                                </a>
+                            </p>
+                        <% } %>
+                        
+                        <a href="/profile/edit" class="btn-elegant w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-500/30 relative z-10 flex items-center justify-center gap-2 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                            Edit Profile
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="stat-card bg-gradient-to-br from-blue-500 to-indigo-600 p-4 rounded-2xl shadow-lg text-white transform hover:scale-105">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-xs opacity-90 mb-1">Stories Published</div>
+                                <div class="text-3xl font-bold"><%= user.totalBlogs %></div>
+                            </div>
+                            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card bg-gradient-to-br from-rose-500 to-pink-600 p-4 rounded-2xl shadow-lg text-white transform hover:scale-105">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-xs opacity-90 mb-1">Total Likes</div>
+                                <div class="text-3xl font-bold"><%= user.totalLikes %></div>
+                            </div>
+                            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                                <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card bg-gradient-to-br from-purple-500 to-violet-600 p-4 rounded-2xl shadow-lg text-white transform hover:scale-105">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-xs opacity-90 mb-1">Comments</div>
+                                <div class="text-3xl font-bold"><%= user.totalComments %></div>
+                            </div>
+                            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="bg-white rounded-2xl shadow-lg border border-slate-100 p-5">
+                    <h3 class="font-display font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        Quick Actions
+                    </h3>
+                    <div class="space-y-2">
+                        <a href="/create" class="flex items-center gap-3 p-3 rounded-xl hover:bg-emerald-50 transition-colors group">
+                            <div class="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <div class="font-semibold text-slate-900 text-sm">New Story</div>
+                                <div class="text-xs text-slate-500">Start writing</div>
+                            </div>
+                        </a>
+                        <a href="/" class="flex items-center gap-3 p-3 rounded-xl hover:bg-blue-50 transition-colors group">
+                            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <div class="font-semibold text-slate-900 text-sm">Explore</div>
+                                <div class="text-xs text-slate-500">Discover stories</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Content - Stories -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+                    <!-- Header with Gradient -->
+                    <div class="bg-gradient-to-r from-emerald-500 to-teal-500 p-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3 text-white">
+                                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 class="text-2xl font-display font-bold">My Stories</h2>
+                                    <p class="text-xs opacity-90"><%= blogs.length %> <%= blogs.length === 1 ? 'story' : 'stories' %> published</p>
+                                </div>
+                            </div>
+                            
+                            <% if (blogs.length > 0) { %>
+                                <a href="/create" class="btn-elegant bg-white text-emerald-700 px-4 py-2 rounded-xl hover:bg-emerald-50 relative z-10 flex items-center gap-2 text-sm font-semibold shadow-lg">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                    </svg>
+                                    New
+                                </a>
+                            <% } %>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6">
+                        <% if (blogs.length > 0) { %>
+                            <div class="space-y-4">
+                                <% blogs.forEach((blog, index) => { %>
+                                    <div class="blog-card-overlay group border border-slate-200 rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 hover:border-emerald-300">
+                                        <div class="flex flex-col sm:flex-row">
+                                            <!-- Thumbnail -->
+                                            <% if (blog.headerImage) { %>
+                                                <a href="/blog/<%= blog._id %>" class="flex-shrink-0 sm:w-48">
+                                                    <div class="h-48 sm:h-full overflow-hidden relative">
+                                                        <img 
+                                                            src="<%= blog.headerImage %>" 
+                                                            alt="<%= blog.title %>"
+                                                            class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                                        >
+                                                        <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                                    </div>
+                                                </a>
+                                            <% } %>
+                                            
+                                            <!-- Content -->
+                                            <div class="flex-1 p-5">
+                                                <div class="flex items-start justify-between mb-3">
+                                                    <div class="flex-1">
+                                                        <h3 class="text-lg font-display font-bold mb-2 line-clamp-2 group-hover:text-emerald-600 transition-colors">
+                                                            <a href="/blog/<%= blog._id %>">
+                                                                <%= blog.title %>
+                                                            </a>
+                                                        </h3>
+                                                        
+                                                        <div class="flex flex-wrap gap-3 text-xs mb-3">
+                                                            <span class="flex items-center gap-1 text-slate-500">
+                                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                                                </svg>
+                                                                <%= new Date(blog.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) %>
+                                                            </span>
+                                                            <span class="flex items-center gap-1 px-2 py-0.5 bg-rose-100 text-rose-600 rounded-full">
+                                                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                                    <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/>
+                                                                </svg>
+                                                                <%= blog.likes ? blog.likes.length : 0 %>
+                                                            </span>
+                                                            <% if (blog.video) { %>
+                                                                <span class="flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-600 rounded-full">
+                                                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                                        <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z"/>
+                                                                    </svg>
+                                                                    Video
+                                                                </span>
+                                                            <% } %>
+                                                        </div>
+                                                        
+                                                        <p class="text-slate-600 text-sm line-clamp-2 leading-relaxed">
+                                                            <%= blog.content.substring(0, 120) %>...
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Actions -->
+                                                <div class="flex gap-2 mt-4">
+                                                    <a href="/blog/<%= blog._id %>" class="btn-elegant flex-1 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 px-4 py-2 rounded-lg text-xs border border-blue-200 hover:from-blue-100 hover:to-indigo-100 relative z-10 flex items-center justify-center gap-1.5 font-semibold">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                                        </svg>
+                                                        View
+                                                    </a>
+                                                    <a href="/blog/<%= blog._id %>/edit" class="btn-elegant flex-1 bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 px-4 py-2 rounded-lg text-xs border border-amber-200 hover:from-amber-100 hover:to-orange-100 relative z-10 flex items-center justify-center gap-1.5 font-semibold">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                                        </svg>
+                                                        Edit
+                                                    </a>
+                                                    <button 
+                                                        onclick="deleteBlog('<%= blog._id %>')" 
+                                                        class="btn-elegant bg-gradient-to-r from-red-50 to-pink-50 text-red-700 px-4 py-2 rounded-lg text-xs border border-red-200 hover:from-red-100 hover:to-pink-100 delete-btn relative z-10 flex items-center gap-1.5 font-semibold"
+                                                        data-blog-id="<%= blog._id %>"
+                                                    >
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                        </svg>
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <% }); %>
+                            </div>
+                        <% } else { %>
+                            <div class="text-center py-20">
+                                <div class="float-animation inline-block mb-6">
+                                    <div class="w-32 h-32 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-full flex items-center justify-center shadow-2xl">
+                                        <svg class="w-16 h-16 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <h3 class="text-2xl font-display font-bold gradient-text mb-3">Your Story Begins Here</h3>
+                                <p class="text-slate-500 mb-8 text-sm max-w-md mx-auto leading-relaxed">
+                                    Share your unique perspective and inspire others. Every great writer started with a single story.
+                                </p>
+                                <a href="/create" class="btn-elegant inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-8 py-3 rounded-xl shadow-lg shadow-emerald-500/30 relative z-10">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                    </svg>
+                                    Write Your First Story
+                                </a>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center hidden z-50 px-4">
+        <div class="modal-content bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div class="text-center mb-4">
+                <div class="w-16 h-16 bg-gradient-to-br from-red-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-3 shimmer">
+                    <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-display font-bold text-slate-900 mb-2">Delete Story?</h3>
+                <p class="text-slate-600 text-sm">
+                    This action cannot be undone. All data will be permanently removed.
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeDeleteModal()" class="flex-1 btn-elegant bg-slate-100 text-slate-700 px-4 py-2.5 rounded-xl hover:bg-slate-200 font-semibold text-sm relative z-10">
+                    Cancel
+                </button>
+                <button id="confirmDelete" class="flex-1 btn-elegant bg-gradient-to-r from-red-500 to-red-600 text-white px-4 py-2.5 rounded-xl hover:from-red-600 hover:to-red-700 font-semibold text-sm shadow-lg shadow-red-500/30 relative z-10">
+                    Delete Forever
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let blogToDelete = null;
+
+        function deleteBlog(blogId) {
+            blogToDelete = blogId;
+            document.getElementById('deleteModal').classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            blogToDelete = null;
+            document.getElementById('deleteModal').classList.add('hidden');
+        }
+
+        document.getElementById('confirmDelete').addEventListener('click', async function() {
+            if (!blogToDelete) return;
+            
+            const button = this;
+            const originalHTML = button.innerHTML;
+            button.innerHTML = '<svg class="animate-spin w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>';
+            button.disabled = true;
+            
+            try {
+                const response = await fetch(`/blog/${blogToDelete}/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    const blogElement = document.querySelector(`[data-blog-id="${blogToDelete}"]`).closest('.blog-card-overlay');
+                    blogElement.style.opacity = '0';
+                    blogElement.style.transform = 'scale(0.95)';
+                    
+                    setTimeout(() => {
+                        blogElement.remove();
+                        const blogsContainer = document.querySelector('.space-y-4');
+                        const remainingBlogs = blogsContainer ? blogsContainer.children.length : 0;
+                        
+                        if (remainingBlogs === 0) {
+                            location.reload();
+                        }
+                    }, 300);
+                    
+                    closeDeleteModal();
+                } else {
+                    alert('Failed to delete: ' + (result.error || 'Unknown error'));
+                    button.innerHTML = originalHTML;
+                    button.disabled = false;
+                }
+            } catch (error) {
+                alert('An error occurred');
+                button.innerHTML = originalHTML;
+                button.disabled = false;
+            }
+        });
+
+        document.getElementById('deleteModal').addEventListener('click', function(e) {
+            if (e.target === this) closeDeleteModal();
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeDeleteModal();
+        });
+    </script>
+</body>
+</html>
