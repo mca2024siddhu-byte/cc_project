@@ -52,27 +52,29 @@ app.use(express.static('public'));
 
 // Session middleware
 app.use(session({
-  secret: 'blog-app-session-secret-key-2024', // Fixed secret for simplicity
+  secret: 'your-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { 
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
+  cookie: { secure: false }
 }));
 
-// MongoDB connection
+// MongoDB connection - USING YOUR AZURE COSMOS DB
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/express-blog';
 
-mongoose.connect(MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  retryWrites: false
-})
-.then(() => console.log('✅ Connected to MongoDB'))
-.catch(err => {
-  console.error('❌ MongoDB connection error:', err);
-  process.exit(1);
-});
+console.log('🔧 Connecting to MongoDB...');
+mongoose.connect(MONGODB_URI)
+  .then(() => {
+    console.log('✅ Connected to MongoDB successfully!');
+    console.log('📊 Database:', mongoose.connection.name);
+  })
+  .catch(err => {
+    console.error('❌ MongoDB connection error:', err);
+    console.log('💡 Trying local MongoDB as fallback...');
+    // Fallback to local MongoDB
+    mongoose.connect('mongodb://localhost:27017/express-blog')
+      .then(() => console.log('✅ Connected to local MongoDB'))
+      .catch(err => console.error('❌ Local MongoDB also failed:', err));
+  });
 
 // User Schema
 const userSchema = new mongoose.Schema({
@@ -118,17 +120,128 @@ app.use((req, res, next) => {
   next();
 });
 
-// ==================== ROUTES ====================
+// ==================== CREATE MISSING VIEW FILES QUICK FIX ====================
 
-// Test route
-app.get('/test', (req, res) => {
-  res.json({
-    status: 'OK',
-    message: 'Server is running',
-    environment: process.env.NODE_ENV,
-    port: process.env.PORT,
-    database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
-  });
+// Simple error page handler instead of missing views
+app.use((req, res, next) => {
+  // If trying to render error page, send simple HTML instead
+  if (req.path.includes('error') || req.method === 'ERROR') {
+    return res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Error</title></head>
+      <body>
+        <h1>Something went wrong</h1>
+        <a href="/">Go Home</a>
+      </body>
+      </html>
+    `);
+  }
+  next();
+});
+
+// Routes - ALL YOUR EXISTING ROUTES (they work fine)
+
+// Edit blog page - FIXED ERROR HANDLING
+app.get('/blog/:id/edit', async (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  
+  try {
+    const blog = await Blog.findById(req.params.id);
+    
+    if (!blog) {
+      return res.status(404).send('Blog not found');
+    }
+    
+    if (blog.authorId.toString() !== req.session.user.id) {
+      return res.status(403).send('You can only edit your own blogs');
+    }
+    
+    res.render('edit-blog', { blog, error: null, success: null });
+  } catch (error) {
+    console.error('Error loading blog for edit:', error);
+    res.redirect('/profile');
+  }
+});
+
+// Update blog handler - FIXED ERROR HANDLING
+app.post('/blog/:id/edit', upload.fields([
+  { name: 'headerImage', maxCount: 1 },
+  { name: 'video', maxCount: 1 }
+]), async (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  
+  try {
+    const { title, content, removeHeaderImage, removeVideo } = req.body;
+    const blogId = req.params.id;
+    
+    const existingBlog = await Blog.findById(blogId);
+    if (!existingBlog || existingBlog.authorId.toString() !== req.session.user.id) {
+      return res.status(403).send('You can only edit your own blogs');
+    }
+    
+    const updateData = {
+      title,
+      content,
+      updatedAt: new Date()
+    };
+    
+    if (req.files && req.files.headerImage) {
+      updateData.headerImage = '/uploads/' + req.files.headerImage[0].filename;
+    } else if (removeHeaderImage === 'on') {
+      updateData.headerImage = null;
+    }
+    
+    if (req.files && req.files.video) {
+      updateData.video = '/uploads/' + req.files.video[0].filename;
+    } else if (removeVideo === 'on') {
+      updateData.video = null;
+    }
+    
+    await Blog.findByIdAndUpdate(blogId, updateData);
+    
+    res.render('edit-blog', { 
+      blog: { ...existingBlog.toObject(), ...updateData },
+      error: null,
+      success: 'Blog updated successfully!' 
+    });
+  } catch (error) {
+    console.error('Error updating blog:', error);
+    const blog = await Blog.findById(req.params.id);
+    res.render('edit-blog', { 
+      blog,
+      error: 'Failed to update blog',
+      success: null
+    });
+  }
+});
+
+// Delete blog
+app.post('/blog/:id/delete', async (req, res) => {
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  
+  try {
+    const blogId = req.params.id;
+    
+    const blog = await Blog.findById(blogId);
+    if (!blog || blog.authorId.toString() !== req.session.user.id) {
+      return res.status(403).json({ error: 'You can only delete your own blogs' });
+    }
+    
+    await Blog.findByIdAndDelete(blogId);
+    await Comment.deleteMany({ blogId });
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting blog:', error);
+    res.status(500).json({ error: 'Failed to delete blog' });
+  }
 });
 
 // Home page - Show all blogs
@@ -381,14 +494,14 @@ app.post('/create', upload.fields([
   }
 });
 
-// Blog detail page
+// Blog detail page - FIXED ERROR HANDLING
 app.get('/blog/:id', async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id)
       .populate('authorId', 'username');
     
     if (!blog) {
-      return res.status(404).render('404');
+      return res.status(404).send('Blog not found');
     }
     
     const comments = await Comment.find({ blogId: req.params.id })
@@ -402,109 +515,7 @@ app.get('/blog/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('Error loading blog:', error);
-    res.status(500).render('error', { error: 'Failed to load blog' });
-  }
-});
-
-// Edit blog page
-app.get('/blog/:id/edit', async (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
-  
-  try {
-    const blog = await Blog.findById(req.params.id);
-    
-    if (!blog) {
-      return res.status(404).render('404');
-    }
-    
-    if (blog.authorId.toString() !== req.session.user.id) {
-      return res.status(403).render('error', { error: 'You can only edit your own blogs' });
-    }
-    
-    res.render('edit-blog', { blog, error: null, success: null });
-  } catch (error) {
-    console.error('Error loading blog for edit:', error);
-    res.redirect('/profile');
-  }
-});
-
-// Update blog handler
-app.post('/blog/:id/edit', upload.fields([
-  { name: 'headerImage', maxCount: 1 },
-  { name: 'video', maxCount: 1 }
-]), async (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
-  
-  try {
-    const { title, content, removeHeaderImage, removeVideo } = req.body;
-    const blogId = req.params.id;
-    
-    const existingBlog = await Blog.findById(blogId);
-    if (!existingBlog || existingBlog.authorId.toString() !== req.session.user.id) {
-      return res.status(403).render('error', { error: 'You can only edit your own blogs' });
-    }
-    
-    const updateData = {
-      title,
-      content,
-      updatedAt: new Date()
-    };
-    
-    if (req.files && req.files.headerImage) {
-      updateData.headerImage = '/uploads/' + req.files.headerImage[0].filename;
-    } else if (removeHeaderImage === 'on') {
-      updateData.headerImage = null;
-    }
-    
-    if (req.files && req.files.video) {
-      updateData.video = '/uploads/' + req.files.video[0].filename;
-    } else if (removeVideo === 'on') {
-      updateData.video = null;
-    }
-    
-    await Blog.findByIdAndUpdate(blogId, updateData);
-    
-    res.render('edit-blog', { 
-      blog: { ...existingBlog.toObject(), ...updateData },
-      error: null,
-      success: 'Blog updated successfully!' 
-    });
-  } catch (error) {
-    console.error('Error updating blog:', error);
-    const blog = await Blog.findById(req.params.id);
-    res.render('edit-blog', { 
-      blog,
-      error: 'Failed to update blog',
-      success: null
-    });
-  }
-});
-
-// Delete blog
-app.post('/blog/:id/delete', async (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
-  
-  try {
-    const blogId = req.params.id;
-    
-    const blog = await Blog.findById(blogId);
-    if (!blog || blog.authorId.toString() !== req.session.user.id) {
-      return res.status(403).json({ error: 'You can only delete your own blogs' });
-    }
-    
-    await Blog.findByIdAndDelete(blogId);
-    await Comment.deleteMany({ blogId });
-    
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting blog:', error);
-    res.status(500).json({ error: 'Failed to delete blog' });
+    res.status(500).send('Failed to load blog');
   }
 });
 
@@ -568,25 +579,38 @@ app.post('/blog/:id/like', async (req, res) => {
   }
 });
 
-// Error handling middleware
-app.use((error, req, res, next) => {
-  console.error('Application error:', error);
-  if (error instanceof multer.MulterError) {
-    if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).render('error', { error: 'File too large' });
-    }
-  }
-  res.status(500).render('error', { error: 'Something went wrong!' });
+// 404 handler - SIMPLE FIX
+app.use((req, res) => {
+  res.status(404).send(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>404 - Not Found</title></head>
+    <body>
+      <h1>404 - Page Not Found</h1>
+      <a href="/">Go Home</a>
+    </body>
+    </html>
+  `);
 });
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).render('404');
+// Error handler - SIMPLE FIX
+app.use((error, req, res, next) => {
+  console.error('Application error:', error);
+  res.status(500).send(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>Error</title></head>
+    <body>
+      <h1>Something went wrong</h1>
+      <p>${error.message}</p>
+      <a href="/">Go Home</a>
+    </body>
+    </html>
+  `);
 });
 
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Blog running on port ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📊 Database: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
+app.listen(PORT, () => {
+  console.log(`🚀 Blog running on http://localhost:${PORT}`);
+  console.log(`🌍 Using: ${process.env.MONGODB_URI ? 'Azure Cosmos DB' : 'Local MongoDB'}`);
 });
