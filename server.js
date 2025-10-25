@@ -61,18 +61,47 @@ app.use(session({
   }
 }));
 
-// MongoDB connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/express-blog';
+// MongoDB connection for Azure Cosmos DB
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ukiblogdb:F4U3Op0uNAdpQybMkKD1xPHDCOtnIfJY8W0D4tW1S614Fa9QQI84e1ujVnwID56i1pPKYkXkuVO4ACDbY6pWTQ%3D%3D@ukiblogdb.mongo.cosmos.azure.com:10255/?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=%40ukiblogdb%40';
 
-mongoose.connect(MONGODB_URI, {
+console.log('🔧 Attempting to connect to MongoDB...');
+console.log('📡 Connection URL:', MONGODB_URI ? 'Provided' : 'Missing');
+
+// MongoDB connection options for Cosmos DB
+const mongooseOptions = {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  retryWrites: false
+  retryWrites: false,
+  // Cosmos DB specific options
+  bufferCommands: false,
+  bufferMaxEntries: 0
+};
+
+mongoose.connect(MONGODB_URI, mongooseOptions)
+.then(() => {
+  console.log('✅ Successfully connected to MongoDB Cosmos DB');
+  console.log('📊 Database name:', mongoose.connection.db?.databaseName);
 })
-.then(() => console.log('Connected to MongoDB'))
 .catch(err => {
-  console.error('MongoDB connection error:', err);
+  console.error('❌ MongoDB connection failed:', err.message);
+  console.log('💡 Please check:');
+  console.log('   1. MongoDB connection string in environment variables');
+  console.log('   2. Cosmos DB service is running');
+  console.log('   3. Network connectivity to Azure');
   process.exit(1);
+});
+
+// Handle MongoDB connection events
+mongoose.connection.on('error', err => {
+  console.error('❌ MongoDB connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('⚠️ MongoDB disconnected');
+});
+
+mongoose.connection.on('connected', () => {
+  console.log('✅ MongoDB connected');
 });
 
 // User Schema
@@ -119,22 +148,52 @@ app.use((req, res, next) => {
   next();
 });
 
-// Error handling middleware
-app.use((error, req, res, next) => {
-  console.error('Error:', error);
-  if (error instanceof multer.MulterError) {
-    if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).render('error', { error: 'File too large' });
-    }
-  }
-  res.status(500).render('error', { error: 'Something went wrong!' });
+// ==================== ROUTES ====================
+
+// Health check route
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
+    environment: process.env.NODE_ENV || 'development'
+  });
 });
 
-// Routes
+// Test route with detailed info
+app.get('/test', async (req, res) => {
+  try {
+    const dbStatus = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
+    const collections = await mongoose.connection.db?.listCollections().toArray();
+    
+    res.json({
+      status: 'OK',
+      message: 'Server is running',
+      environment: process.env.NODE_ENV,
+      port: process.env.PORT,
+      database: dbStatus,
+      collections: collections ? collections.map(c => c.name) : 'No access'
+    });
+  } catch (error) {
+    res.json({
+      status: 'Error',
+      message: error.message,
+      database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
+    });
+  }
+});
 
 // Home page - Show all blogs
 app.get('/', async (req, res) => {
   try {
+    // Check if database is connected
+    if (mongoose.connection.readyState !== 1) {
+      return res.render('index', { 
+        blogs: [], 
+        error: 'Database connection issue. Please try again later.' 
+      });
+    }
+
     const blogs = await Blog.find()
       .populate('authorId', 'username')
       .sort({ createdAt: -1 });
@@ -157,7 +216,7 @@ app.get('/', async (req, res) => {
     console.error('Error loading blogs:', error);
     res.render('index', { 
       blogs: [], 
-      error: 'Failed to load blogs' 
+      error: 'Failed to load blogs. Please try again.' 
     });
   }
 });
@@ -205,6 +264,15 @@ app.post('/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
     
+    // Basic validation
+    if (!username || !email || !password) {
+      return res.render('register', { error: 'All fields are required' });
+    }
+    
+    if (password.length < 6) {
+      return res.render('register', { error: 'Password must be at least 6 characters' });
+    }
+    
     const existingUser = await User.findOne({ 
       $or: [{ email }, { username }] 
     });
@@ -230,7 +298,7 @@ app.post('/register', async (req, res) => {
     res.redirect('/');
   } catch (error) {
     console.error('Registration error:', error);
-    res.render('register', { error: 'Registration failed' });
+    res.render('register', { error: 'Registration failed: ' + error.message });
   }
 });
 
@@ -569,6 +637,17 @@ app.post('/blog/:id/like', async (req, res) => {
   }
 });
 
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error('Application error:', error);
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).render('error', { error: 'File too large' });
+    }
+  }
+  res.status(500).render('error', { error: 'Something went wrong!' });
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).render('404');
@@ -576,6 +655,7 @@ app.use((req, res) => {
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Blog running on http://localhost:${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🚀 Blog running on port ${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📊 Database: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
 });
