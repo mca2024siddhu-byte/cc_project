@@ -593,7 +593,7 @@ app.use((req, res) => {
   `);
 });
 
-// Error handler - SIMPLE FIX
+// Error handler 
 app.use((error, req, res, next) => {
   console.error('Application error:', error);
   res.status(500).send(`
