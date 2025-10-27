@@ -52,7 +52,7 @@ app.use(express.static('public'));
 
 // Session middleware
 app.use(session({
-  secret: 'your-secret-key',
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
   cookie: { secure: false }
@@ -80,7 +80,8 @@ mongoose.connect(MONGODB_URI)
 const userSchema = new mongoose.Schema({
   username: { type: String, unique: true, required: true },
   email: { type: String, unique: true, required: true },
-  password: { type: String, required: true },
+  password: { type: String },
+  googleId: { type: String }, // For Google OAuth users
   profilePicture: { type: String, default: '/uploads/default-avatar.png' },
   bio: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now }
@@ -114,137 +115,69 @@ const commentSchema = new mongoose.Schema({
 
 const Comment = mongoose.model('Comment', commentSchema);
 
-// Middleware to make user available to all templates
-app.use((req, res, next) => {
-  res.locals.user = req.session.user || null;
+// ==================== AZURE EASY AUTH INTEGRATION ====================
+
+// Middleware to handle Azure Easy Auth user information
+app.use(async (req, res, next) => {
+  try {
+    // Check if user is authenticated via Azure Easy Auth
+    const userJson = req.headers['x-ms-client-principal'];
+    
+    if (userJson) {
+      const userBuffer = Buffer.from(userJson, 'base64');
+      const azureUser = JSON.parse(userBuffer.toString());
+      
+      // Find or create user in our database
+      let user = await User.findOne({ 
+        $or: [
+          { email: azureUser.userDetails },
+          { googleId: azureUser.userId }
+        ]
+      });
+      
+      if (!user) {
+        // Create new user from Azure Easy Auth
+        user = await User.create({
+          username: azureUser.userDetails.split('@')[0], // Use email prefix as username
+          email: azureUser.userDetails,
+          googleId: azureUser.userId,
+          profilePicture: '/uploads/default-avatar.png'
+        });
+      }
+      
+      // Store user in session
+      req.session.user = {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        googleId: user.googleId
+      };
+    }
+    
+    // Make user available to all templates
+    res.locals.user = req.session.user || null;
+    res.locals.isAuthenticated = !!req.session.user;
+    
+  } catch (error) {
+    console.error('Error in auth middleware:', error);
+    res.locals.user = null;
+    res.locals.isAuthenticated = false;
+  }
   next();
 });
 
-// ==================== CREATE MISSING VIEW FILES QUICK FIX ====================
-
-// Simple error page handler instead of missing views
-app.use((req, res, next) => {
-  // If trying to render error page, send simple HTML instead
-  if (req.path.includes('error') || req.method === 'ERROR') {
-    return res.status(500).send(`
-      <!DOCTYPE html>
-      <html>
-      <head><title>Error</title></head>
-      <body>
-        <h1>Something went wrong</h1>
-        <a href="/">Go Home</a>
-      </body>
-      </html>
-    `);
+// Protect routes that require authentication
+const requireAuth = (req, res, next) => {
+  if (!res.locals.isAuthenticated) {
+    // Redirect to Google login, then back to original URL
+    return res.redirect(`/.auth/login/google?post_login_redirect_uri=${encodeURIComponent(req.originalUrl)}`);
   }
   next();
-});
+};
 
-// Routes - ALL YOUR EXISTING ROUTES (they work fine)
+// ==================== ROUTES ====================
 
-// Edit blog page - FIXED ERROR HANDLING
-app.get('/blog/:id/edit', async (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
-  
-  try {
-    const blog = await Blog.findById(req.params.id);
-    
-    if (!blog) {
-      return res.status(404).send('Blog not found');
-    }
-    
-    if (blog.authorId.toString() !== req.session.user.id) {
-      return res.status(403).send('You can only edit your own blogs');
-    }
-    
-    res.render('edit-blog', { blog, error: null, success: null });
-  } catch (error) {
-    console.error('Error loading blog for edit:', error);
-    res.redirect('/profile');
-  }
-});
-
-// Update blog handler - FIXED ERROR HANDLING
-app.post('/blog/:id/edit', upload.fields([
-  { name: 'headerImage', maxCount: 1 },
-  { name: 'video', maxCount: 1 }
-]), async (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
-  
-  try {
-    const { title, content, removeHeaderImage, removeVideo } = req.body;
-    const blogId = req.params.id;
-    
-    const existingBlog = await Blog.findById(blogId);
-    if (!existingBlog || existingBlog.authorId.toString() !== req.session.user.id) {
-      return res.status(403).send('You can only edit your own blogs');
-    }
-    
-    const updateData = {
-      title,
-      content,
-      updatedAt: new Date()
-    };
-    
-    if (req.files && req.files.headerImage) {
-      updateData.headerImage = '/uploads/' + req.files.headerImage[0].filename;
-    } else if (removeHeaderImage === 'on') {
-      updateData.headerImage = null;
-    }
-    
-    if (req.files && req.files.video) {
-      updateData.video = '/uploads/' + req.files.video[0].filename;
-    } else if (removeVideo === 'on') {
-      updateData.video = null;
-    }
-    
-    await Blog.findByIdAndUpdate(blogId, updateData);
-    
-    res.render('edit-blog', { 
-      blog: { ...existingBlog.toObject(), ...updateData },
-      error: null,
-      success: 'Blog updated successfully!' 
-    });
-  } catch (error) {
-    console.error('Error updating blog:', error);
-    const blog = await Blog.findById(req.params.id);
-    res.render('edit-blog', { 
-      blog,
-      error: 'Failed to update blog',
-      success: null
-    });
-  }
-});
-
-// Delete blog
-app.post('/blog/:id/delete', async (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
-  
-  try {
-    const blogId = req.params.id;
-    
-    const blog = await Blog.findById(blogId);
-    if (!blog || blog.authorId.toString() !== req.session.user.id) {
-      return res.status(403).json({ error: 'You can only delete your own blogs' });
-    }
-    
-    await Blog.findByIdAndDelete(blogId);
-    await Comment.deleteMany({ blogId });
-    
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting blog:', error);
-    res.status(500).json({ error: 'Failed to delete blog' });
-  }
-});
-
-// Home page - Show all blogs
+// Home page - Show all blogs (Public - no auth required)
 app.get('/', async (req, res) => {
   try {
     const blogs = await Blog.find()
@@ -274,12 +207,43 @@ app.get('/', async (req, res) => {
   }
 });
 
-// Login page
+// Blog detail page - FIXED ERROR HANDLING (Public - no auth required)
+app.get('/blog/:id', async (req, res) => {
+  try {
+    const blog = await Blog.findById(req.params.id)
+      .populate('authorId', 'username');
+    
+    if (!blog) {
+      return res.status(404).send('Blog not found');
+    }
+    
+    const comments = await Comment.find({ blogId: req.params.id })
+      .populate('authorId', 'username')
+      .sort({ createdAt: 1 });
+    
+    res.render('blog', { 
+      blog: blog.toObject(), 
+      comments,
+      user: req.session.user 
+    });
+  } catch (error) {
+    console.error('Error loading blog:', error);
+    res.status(500).send('Failed to load blog');
+  }
+});
+
+// ==================== AUTHENTICATION ROUTES ====================
+
+// Login page (Traditional email/password)
 app.get('/login', (req, res) => {
+  // If already authenticated, redirect to home
+  if (res.locals.isAuthenticated) {
+    return res.redirect('/');
+  }
   res.render('login', { error: null });
 });
 
-// Login handler
+// Login handler (Traditional email/password)
 app.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -287,6 +251,14 @@ app.post('/login', async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       return res.render('login', { error: 'Invalid email or password' });
+    }
+    
+    // Check if user has a password (Google users might not have one)
+    if (!user.password) {
+      return res.render('login', { 
+        error: 'Please use Google Sign-In for this account',
+        googleAuthUrl: '/.auth/login/google?post_login_redirect_uri=/'
+      });
     }
     
     const validPassword = await bcrypt.compare(password, user.password);
@@ -309,10 +281,14 @@ app.post('/login', async (req, res) => {
 
 // Register page
 app.get('/register', (req, res) => {
+  // If already authenticated, redirect to home
+  if (res.locals.isAuthenticated) {
+    return res.redirect('/');
+  }
   res.render('register', { error: null });
 });
 
-// Register handler
+// Register handler (Traditional email/password)
 app.post('/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -346,12 +322,21 @@ app.post('/register', async (req, res) => {
   }
 });
 
+// Logout
+app.post('/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Logout error:', err);
+    }
+    // Redirect to Azure logout or home
+    res.redirect('/.auth/logout?post_logout_redirect_uri=/');
+  });
+});
+
+// ==================== PROTECTED ROUTES (Require Authentication) ====================
+
 // Profile page
-app.get('/profile', async (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
-  
+app.get('/profile', requireAuth, async (req, res) => {
   try {
     const userBlogs = await Blog.find({ authorId: req.session.user.id })
       .sort({ createdAt: -1 });
@@ -384,19 +369,12 @@ app.get('/profile', async (req, res) => {
 });
 
 // Update profile route
-app.get('/profile/edit', (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
+app.get('/profile/edit', requireAuth, (req, res) => {
   res.render('edit-profile', { error: null, success: null });
 });
 
 // Update profile handler
-app.post('/profile/edit', upload.single('profilePicture'), async (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
-  
+app.post('/profile/edit', requireAuth, upload.single('profilePicture'), async (req, res) => {
   try {
     const { username, email, bio } = req.body;
     const updateData = { username, email, bio };
@@ -444,29 +422,16 @@ app.post('/profile/edit', upload.single('profilePicture'), async (req, res) => {
   }
 });
 
-// Logout
-app.post('/logout', (req, res) => {
-  req.session.destroy();
-  res.redirect('/');
-});
-
 // Create blog page
-app.get('/create', (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
+app.get('/create', requireAuth, (req, res) => {
   res.render('create', { error: null });
 });
 
 // Create blog handler
-app.post('/create', upload.fields([
+app.post('/create', requireAuth, upload.fields([
   { name: 'headerImage', maxCount: 1 },
   { name: 'video', maxCount: 1 }
 ]), async (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
-  
   try {
     const { title, content } = req.body;
     
@@ -494,37 +459,98 @@ app.post('/create', upload.fields([
   }
 });
 
-// Blog detail page - FIXED ERROR HANDLING
-app.get('/blog/:id', async (req, res) => {
+// Edit blog page
+app.get('/blog/:id/edit', requireAuth, async (req, res) => {
   try {
-    const blog = await Blog.findById(req.params.id)
-      .populate('authorId', 'username');
+    const blog = await Blog.findById(req.params.id);
     
     if (!blog) {
       return res.status(404).send('Blog not found');
     }
     
-    const comments = await Comment.find({ blogId: req.params.id })
-      .populate('authorId', 'username')
-      .sort({ createdAt: 1 });
+    if (blog.authorId.toString() !== req.session.user.id) {
+      return res.status(403).send('You can only edit your own blogs');
+    }
     
-    res.render('blog', { 
-      blog: blog.toObject(), 
-      comments,
-      user: req.session.user 
+    res.render('edit-blog', { blog, error: null, success: null });
+  } catch (error) {
+    console.error('Error loading blog for edit:', error);
+    res.redirect('/profile');
+  }
+});
+
+// Update blog handler
+app.post('/blog/:id/edit', requireAuth, upload.fields([
+  { name: 'headerImage', maxCount: 1 },
+  { name: 'video', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    const { title, content, removeHeaderImage, removeVideo } = req.body;
+    const blogId = req.params.id;
+    
+    const existingBlog = await Blog.findById(blogId);
+    if (!existingBlog || existingBlog.authorId.toString() !== req.session.user.id) {
+      return res.status(403).send('You can only edit your own blogs');
+    }
+    
+    const updateData = {
+      title,
+      content,
+      updatedAt: new Date()
+    };
+    
+    if (req.files && req.files.headerImage) {
+      updateData.headerImage = '/uploads/' + req.files.headerImage[0].filename;
+    } else if (removeHeaderImage === 'on') {
+      updateData.headerImage = null;
+    }
+    
+    if (req.files && req.files.video) {
+      updateData.video = '/uploads/' + req.files.video[0].filename;
+    } else if (removeVideo === 'on') {
+      updateData.video = null;
+    }
+    
+    await Blog.findByIdAndUpdate(blogId, updateData);
+    
+    res.render('edit-blog', { 
+      blog: { ...existingBlog.toObject(), ...updateData },
+      error: null,
+      success: 'Blog updated successfully!' 
     });
   } catch (error) {
-    console.error('Error loading blog:', error);
-    res.status(500).send('Failed to load blog');
+    console.error('Error updating blog:', error);
+    const blog = await Blog.findById(req.params.id);
+    res.render('edit-blog', { 
+      blog,
+      error: 'Failed to update blog',
+      success: null
+    });
+  }
+});
+
+// Delete blog
+app.post('/blog/:id/delete', requireAuth, async (req, res) => {
+  try {
+    const blogId = req.params.id;
+    
+    const blog = await Blog.findById(blogId);
+    if (!blog || blog.authorId.toString() !== req.session.user.id) {
+      return res.status(403).json({ error: 'You can only delete your own blogs' });
+    }
+    
+    await Blog.findByIdAndDelete(blogId);
+    await Comment.deleteMany({ blogId });
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting blog:', error);
+    res.status(500).json({ error: 'Failed to delete blog' });
   }
 });
 
 // Add comment
-app.post('/blog/:id/comment', async (req, res) => {
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
-  
+app.post('/blog/:id/comment', requireAuth, async (req, res) => {
   try {
     const { content } = req.body;
     
@@ -543,11 +569,7 @@ app.post('/blog/:id/comment', async (req, res) => {
 });
 
 // Like blog
-app.post('/blog/:id/like', async (req, res) => {
-  if (!req.session.user) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-  
+app.post('/blog/:id/like', requireAuth, async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id);
     
@@ -579,7 +601,44 @@ app.post('/blog/:id/like', async (req, res) => {
   }
 });
 
-// 404 handler - SIMPLE FIX
+// ==================== HEALTH AND DEBUG ROUTES ====================
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  const health = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    authentication: {
+      isAuthenticated: res.locals.isAuthenticated,
+      user: res.locals.user ? 'logged_in' : 'guest'
+    }
+  };
+  
+  res.status(200).json(health);
+});
+
+// Debug endpoint to check Azure Easy Auth headers
+app.get('/debug-auth', (req, res) => {
+  const authInfo = {
+    headers: {
+      'x-ms-client-principal': req.headers['x-ms-client-principal'],
+      'x-ms-client-principal-name': req.headers['x-ms-client-principal-name'],
+      'x-ms-client-principal-id': req.headers['x-ms-client-principal-id']
+    },
+    session: req.session.user,
+    locals: {
+      user: res.locals.user,
+      isAuthenticated: res.locals.isAuthenticated
+    }
+  };
+  
+  res.json(authInfo);
+});
+
+// ==================== ERROR HANDLERS ====================
+
+// 404 handler
 app.use((req, res) => {
   res.status(404).send(`
     <!DOCTYPE html>
@@ -610,7 +669,8 @@ app.use((error, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Blog running on http://localhost:${PORT}`);
   console.log(`🌍 Using: ${process.env.MONGODB_URI ? 'Azure Cosmos DB' : 'Local MongoDB'}`);
+  console.log(`🔐 Authentication: Azure Easy Auth Integrated`);
 });
