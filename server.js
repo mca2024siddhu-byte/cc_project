@@ -115,8 +115,9 @@ const commentSchema = new mongoose.Schema({
 
 const Comment = mongoose.model('Comment', commentSchema);
 
-// ==================== IMPROVED AZURE EASY AUTH INTEGRATION ====================
+// ==================== AZURE EASY AUTH INTEGRATION ====================
 
+// Middleware to handle Azure Easy Auth user information
 app.use(async (req, res, next) => {
   try {
     // Check if user is authenticated via Azure Easy Auth
@@ -137,42 +138,20 @@ app.use(async (req, res, next) => {
       if (!user) {
         // Create new user from Azure Easy Auth
         user = await User.create({
-          username: azureUser.userDetails.split('@')[0],
+          username: azureUser.userDetails.split('@')[0], // Use email prefix as username
           email: azureUser.userDetails,
           googleId: azureUser.userId,
           profilePicture: '/uploads/default-avatar.png'
         });
       }
       
-      // Check if session user matches Azure user
-      const sessionUserId = req.session.user?.id?.toString();
-      const currentUserId = user._id.toString();
-      
-      // If session user is different from Azure user, clear session and update
-      if (sessionUserId && sessionUserId !== currentUserId) {
-        console.log('🔄 User changed, updating session...');
-        req.session.destroy((err) => {
-          if (err) console.error('Error destroying session:', err);
-        });
-      }
-      
-      // Update session with current user
+      // Store user in session
       req.session.user = {
         id: user._id,
         username: user.username,
         email: user.email,
         googleId: user.googleId
       };
-      
-      console.log('🔐 Session updated for:', user.username);
-    } else {
-      // No Azure auth - clear session if it exists
-      if (req.session.user) {
-        console.log('🚫 No Azure auth, clearing session');
-        req.session.destroy((err) => {
-          if (err) console.error('Error destroying session:', err);
-        });
-      }
     }
     
     // Make user available to all templates
